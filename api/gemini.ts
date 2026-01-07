@@ -2,21 +2,22 @@ export const config = {
   runtime: 'edge',
 };
 
-type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: JsonValue }
-  | JsonValue[];
+function safeJson(data: unknown) {
+  // Some SDK objects include non-JSON types; this normalizes them for Response.
+  try {
+    return JSON.parse(JSON.stringify(data));
+  } catch {
+    return { error: 'Response is not JSON serializable' };
+  }
+}
 
-function jsonResponse(data: JsonValue, init?: ResponseInit) {
+function jsonResponse(data: unknown, init?: ResponseInit) {
   const headers = new Headers(init?.headers);
   headers.set('content-type', 'application/json; charset=utf-8');
   headers.set('access-control-allow-origin', '*');
   headers.set('access-control-allow-methods', 'POST, OPTIONS');
   headers.set('access-control-allow-headers', 'content-type');
-  return new Response(JSON.stringify(data), { ...init, headers });
+  return new Response(JSON.stringify(safeJson(data)), { ...init, headers });
 }
 
 export default async function handler(req: Request): Promise<Response> {
