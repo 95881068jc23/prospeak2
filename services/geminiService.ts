@@ -9,16 +9,43 @@ type GeminiProxyResponse = {
   error?: string;
 };
 
-const generateContentViaEdge = async (args: any): Promise<GeminiProxyResponse> => {
-  const res = await fetch('/api/gemini', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(args),
-  });
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  const data = (await res.json().catch(() => ({}))) as GeminiProxyResponse;
-  if (!res.ok) throw new Error(data?.error || `Gemini proxy error (${res.status})`);
-  return data;
+const generateContentViaEdge = async (args: any): Promise<GeminiProxyResponse> => {
+  // Simple retry for flaky networks (common for some Mainland networks).
+  const delays = [0, 300, 900];
+  let lastErr: any = null;
+
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    if (delays[attempt] > 0) await sleep(delays[attempt]);
+    try {
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(args),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as GeminiProxyResponse;
+      if (!res.ok) {
+        const msg = data?.error || `Gemini proxy error (${res.status})`;
+        // Retry on transient server errors / rate limit.
+        if (res.status === 429 || res.status >= 500) {
+          lastErr = new Error(msg);
+          continue;
+        }
+        throw new Error(msg);
+      }
+      return data;
+    } catch (e: any) {
+      lastErr = e;
+      // If it's a network failure (TypeError in fetch) we retry; otherwise lastErr will be thrown.
+      continue;
+    }
+  }
+
+  // Surface a more helpful error in console for debugging.
+  console.error('Gemini proxy request failed after retries', lastErr, { model: args?.model });
+  throw lastErr instanceof Error ? lastErr : new Error('Gemini proxy request failed');
 };
 
 const MODEL_NAME = "gemini-3-flash-preview"; 
