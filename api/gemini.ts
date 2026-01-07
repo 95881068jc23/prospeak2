@@ -22,6 +22,33 @@ function jsonResponse(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(safeJson(data)), { ...init, headers });
 }
 
+function normalizeModelName(model: string): string {
+  // Accept "gemini-..." or "models/gemini-..."
+  const trimmed = model.trim();
+  if (trimmed.startsWith('models/')) return trimmed.slice('models/'.length);
+  return trimmed;
+}
+
+function toRestContents(contents: any): any[] {
+  // SDK allows string prompt; REST expects contents[]
+  if (typeof contents === 'string') {
+    return [{ role: 'user', parts: [{ text: contents }] }];
+  }
+  if (Array.isArray(contents)) return contents;
+  // If someone passes a single content object
+  if (contents && typeof contents === 'object') return [contents];
+  return [{ role: 'user', parts: [{ text: '' }] }];
+}
+
+function extractTextFromResponse(resp: any): string {
+  const parts = resp?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return '';
+  return parts
+    .map((p: any) => (typeof p?.text === 'string' ? p.text : ''))
+    .filter(Boolean)
+    .join('');
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, { status: 204 });
   if (req.method !== 'POST') return jsonResponse({ error: 'Method Not Allowed' }, { status: 405 });
@@ -37,19 +64,64 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    // IMPORTANT: Edge runtime should use the Web build, not the Node build.
-    const { GoogleGenAI } = await import('@google/genai/web');
-    const ai = new GoogleGenAI({ apiKey });
+    const params = body as any;
+    const model = normalizeModelName(String(params?.model || ''));
+    if (!model) return jsonResponse({ error: 'Missing field: model' }, { status: 400 });
 
-    // We intentionally accept the same payload shape as ai.models.generateContent(...)
-    // from @google/genai, so the frontend can forward args directly.
-    const result = await ai.models.generateContent(body as any);
+    const cfg = params?.config || {};
+    const systemInstruction = cfg?.systemInstruction;
+
+    // Map SDK config -> REST generationConfig
+    const generationConfig: Record<string, any> = {};
+    const passThroughKeys = [
+      'temperature',
+      'topP',
+      'topK',
+      'candidateCount',
+      'maxOutputTokens',
+      'stopSequences',
+      'presencePenalty',
+      'frequencyPenalty',
+      'seed',
+      'responseMimeType',
+      'responseModalities',
+      'speechConfig',
+      'thinkingConfig',
+    ];
+    for (const k of passThroughKeys) {
+      if (cfg?.[k] !== undefined) generationConfig[k] = cfg[k];
+    }
+
+    const restBody: Record<string, any> = {
+      contents: toRestContents(params?.contents),
+    };
+    if (systemInstruction !== undefined) restBody.systemInstruction = systemInstruction;
+    if (Object.keys(generationConfig).length > 0) restBody.generationConfig = generationConfig;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      model
+    )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(restBody),
+    });
+
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const msg =
+        (json as any)?.error?.message ||
+        (json as any)?.message ||
+        `Gemini REST error (${resp.status})`;
+      return jsonResponse({ error: msg, detail: json }, { status: 500 });
+    }
 
     return jsonResponse(
       {
-        text: result?.text ?? '',
-        candidates: result?.candidates ?? null,
-        usageMetadata: (result as any)?.usageMetadata ?? null,
+        text: extractTextFromResponse(json),
+        candidates: (json as any)?.candidates ?? null,
+        usageMetadata: (json as any)?.usageMetadata ?? null,
       },
       { status: 200 }
     );
