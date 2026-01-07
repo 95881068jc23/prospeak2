@@ -1,19 +1,25 @@
 
-import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { TestReport, Message, UserProfile, Avatar, AnalysisItem, SuggestionItem, LearningConfig, PlaybackSpeed } from "../types";
 import { ASSESSMENT_SCRIPTS } from "../constants";
 
-// Safe API Key retrieval
-const getApiKey = (): string => {
-  try {
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-      return process.env.API_KEY;
-    }
-  } catch (e) {}
-  return '';
+type GeminiProxyResponse = {
+  text?: string;
+  candidates?: any;
+  usageMetadata?: any;
+  error?: string;
 };
 
-const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
+const generateContentViaEdge = async (args: any): Promise<GeminiProxyResponse> => {
+  const res = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as GeminiProxyResponse;
+  if (!res.ok) throw new Error(data?.error || `Gemini proxy error (${res.status})`);
+  return data;
+};
 
 const MODEL_NAME = "gemini-3-flash-preview"; 
 const REPORT_MODEL_NAME = "gemini-3-flash-preview"; 
@@ -155,15 +161,14 @@ class HybridVoiceService {
   }
 
   private async fetchNativeAudioUrl(text: string, avatar: Avatar): Promise<string | null> {
-      const ai = getAI();
       const voiceName = GEMINI_VOICE_MAP[avatar.name] || 'Puck';
       const tonePrefix = AVATAR_TONE_MAP[avatar.name] || '';
 
-      const response = await ai.models.generateContent({
+      const response = await generateContentViaEdge({
         model: TTS_MODEL_NAME,
         contents: [{ parts: [{ text: `${tonePrefix}${text}` }] }],
         config: {
-          responseModalities: [Modality.AUDIO],
+          responseModalities: ['AUDIO'],
           speechConfig: {
               voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } }
           }
@@ -323,8 +328,7 @@ export const generateLearningPlan = async (config: LearningConfig): Promise<stri
         Example: ["Question 1", "Question 2"]`;
         
         try {
-            const ai = getAI();
-            const response = await ai.models.generateContent({
+            const response = await generateContentViaEdge({
                 model: MODEL_NAME,
                 contents: [{ parts: [{ text: systemPrompt }] }],
                 config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
@@ -411,9 +415,8 @@ export const generateNextQuestion = async (
     "isConclusion": boolean
   }`;
   
-  const ai = getAI();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateContentViaEdge({
       model: MODEL_NAME,
       contents: [{ role: 'user', parts: [{ text: `History:\n${historyContext}\n\nGenerate next response.` }] }],
       config: {
@@ -608,9 +611,8 @@ export const generateLearningResponse = async (
           "isClarification": false 
         }`;
         
-        const ai = getAI();
         try {
-            const response = await ai.models.generateContent({
+            const response = await generateContentViaEdge({
                 model: MODEL_NAME,
                 contents: [{ role: 'user', parts: [{ text: "Start the lesson." }] }],
                 config: { systemInstruction: SYSTEM_INSTRUCTION_INIT, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
@@ -676,9 +678,8 @@ export const generateLearningResponse = async (
         "isClarification": boolean
     }`;
 
-    const ai = getAI();
     try {
-        const response = await ai.models.generateContent({
+        const response = await generateContentViaEdge({
             model: MODEL_NAME,
             contents: [{ role: 'user', parts: [{ text: `History:\n${historyContext}\n\nGenerate next tutor response.` }] }],
             config: {
@@ -723,7 +724,6 @@ export const generateConclusion = async (
 };
 
 export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
-  const ai = getAI();
   try {
     const reader = new FileReader();
     const base64Promise = new Promise<string>((resolve) => {
@@ -731,7 +731,7 @@ export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
         reader.readAsDataURL(audioBlob);
     });
     const base64Audio = await base64Promise;
-    const response = await ai.models.generateContent({
+    const response = await generateContentViaEdge({
       model: MODEL_NAME,
       contents: [{ parts: [{ inlineData: { mimeType: audioBlob.type, data: base64Audio } }, { text: "Transcribe exactly. If empty audio/noise, return ''." }] }],
       config: { temperature: 0, thinkingConfig: { thinkingBudget: 0 } }
@@ -750,7 +750,6 @@ export const generateFinalReport = async (history: Message[], learningDuration?:
      return `${h.role.toUpperCase()}: ${h.text}${meta}`;
   }).join('\n');
 
-  const ai = getAI();
   const prompt = `Analyze this oral English transcript.
   Return JSON. All content bilingual (English + Chinese).
   MODE: ${isLearning ? 'LEARNING/PRACTICE' : 'PROFESSIONAL ASSESSMENT'}
@@ -788,7 +787,7 @@ export const generateFinalReport = async (history: Message[], learningDuration?:
   Transcript:\n${transcript}`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateContentViaEdge({
       model: REPORT_MODEL_NAME, 
       contents: prompt,
       config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
@@ -859,7 +858,6 @@ export const generateDetailedTranscriptAnalysis = async (
   }
   if (pairs.length === 0) return [];
   const transcriptContext = pairs.map((pair, i) => `Turn ${i+1}:\nTutor Asked: "${pair.q}"\nStudent Answered: "${pair.a}"`).join('\n\n');
-  const ai = getAI();
   const prompt = `Analyze this English session sentence-by-sentence.
   TASK: Generate a detailed analysis table.
   CONTEXT: Level: ${cefrLevel || 'General'}. Mode: ${isLearningMode ? 'Learning' : 'Assessment'}
@@ -873,7 +871,7 @@ export const generateDetailedTranscriptAnalysis = async (
   Transcript:\n${transcriptContext}`;
 
   try {
-     const response = await ai.models.generateContent({
+     const response = await generateContentViaEdge({
         model: REPORT_MODEL_NAME, 
         contents: prompt,
         config: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
