@@ -1,7 +1,8 @@
 export const config = {
   runtime: 'edge',
-  // Mainland users often have higher latency to some regions; pin to HK for stability.
-  regions: ['hkg1'],
+  // Google Gemini API is not available in Hong Kong (hkg1).
+  // Using Singapore (sin1) provides good latency for Asian users while being outside the restricted region.
+  regions: ['sin1'], 
 };
 
 function safeJson(data: unknown) {
@@ -54,7 +55,10 @@ export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method Not Allowed' }, { status: 405 });
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return jsonResponse({ error: 'Missing env: GEMINI_API_KEY' }, { status: 500 });
+  if (!apiKey) {
+    console.error("Missing env: GEMINI_API_KEY");
+    return jsonResponse({ error: 'Missing env: GEMINI_API_KEY' }, { status: 500 });
+  }
 
   let body: unknown;
   try {
@@ -109,7 +113,9 @@ export default async function handler(req: Request): Promise<Response> {
     });
 
     const json = await resp.json().catch(() => ({}));
+    
     if (!resp.ok) {
+      console.error(`Gemini API Error (${resp.status}):`, JSON.stringify(json));
       const msg =
         (json as any)?.error?.message ||
         (json as any)?.message ||
@@ -126,10 +132,10 @@ export default async function handler(req: Request): Promise<Response> {
       { status: 200 }
     );
   } catch (e: any) {
+    console.error("Gemini Edge Function Exception:", e);
     const message = typeof e?.message === 'string' ? e.message : 'Gemini request failed';
     // Include a tiny bit more detail for debugging without leaking secrets.
     const detail = typeof e?.cause?.message === 'string' ? e.cause.message : undefined;
     return jsonResponse({ error: message, detail }, { status: 500 });
   }
 }
-
