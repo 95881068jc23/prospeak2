@@ -15,6 +15,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/1SzFilmfzFvI7PXcr2HZkYd
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+2. Set the environment variable `GEMINI_API_KEY` (used by Vercel Edge Function via `process.env.GEMINI_API_KEY`)
+   - Local: put it in `.env.local` (it is gitignored)
+   - Vercel: add it in Project Settings → Environment Variables
+3. Run locally with Vercel (so `/api/gemini` is available):
+   `npm run dev:vercel`
