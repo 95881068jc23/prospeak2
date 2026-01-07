@@ -37,7 +37,8 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const { GoogleGenAI } = await import('@google/genai');
+    // IMPORTANT: Edge runtime should use the Web build, not the Node build.
+    const { GoogleGenAI } = await import('@google/genai/web');
     const ai = new GoogleGenAI({ apiKey });
 
     // We intentionally accept the same payload shape as ai.models.generateContent(...)
@@ -54,7 +55,9 @@ export default async function handler(req: Request): Promise<Response> {
     );
   } catch (e: any) {
     const message = typeof e?.message === 'string' ? e.message : 'Gemini request failed';
-    return jsonResponse({ error: message }, { status: 500 });
+    // Include a tiny bit more detail for debugging without leaking secrets.
+    const detail = typeof e?.cause?.message === 'string' ? e.cause.message : undefined;
+    return jsonResponse({ error: message, detail }, { status: 500 });
   }
 }
 
