@@ -1,5 +1,7 @@
 export const config = {
   runtime: 'edge',
+  // Mainland users often have higher latency to some regions; pin to HK for stability.
+  regions: ['hkg1'],
 };
 
 function safeJson(data: unknown) {
