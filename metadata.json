@@ -1,0 +1,7 @@
+{
+  "name": "ME ProSpeak 麦迩威英语AI口语伴学2.0（企业版）",
+  "description": "A professional, AI-driven oral English assessment tool designed for adults. Features adaptive testing across three stages, detailed CEFR analysis, and comprehensive feedback reports.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
