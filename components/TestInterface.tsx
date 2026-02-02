@@ -24,6 +24,7 @@ export const TestInterface: React.FC<Props> = ({ onComplete, onQuit, userProfile
   const [showTranslation, setShowTranslation] = useState(false);
   const [showHints, setShowHints] = useState(false);
   const [showAssistant, setShowAssistant] = useState(false); // New state for assistant visibility
+  const [showPlayOverlay, setShowPlayOverlay] = useState<{show: boolean, text?: string}>({ show: false });
   
   // Audio Mode State: 'CLOUD' (Gemini) or 'LOCAL' (Browser TTS)
   const [audioMode, setAudioMode] = useState<'CLOUD' | 'LOCAL'>('CLOUD');
