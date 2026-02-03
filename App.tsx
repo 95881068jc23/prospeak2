@@ -6,14 +6,22 @@ import { TestInterface } from './components/TestInterface';
 import { LearningSetupScreen } from './components/LearningSetupScreen';
 import { LearningInterface } from './components/LearningInterface';
 import { ReportScreen } from './components/ReportScreen';
-import { LessonPreviewScreen } from './components/LessonPreviewScreen'; // New Import
-import { TestStage, Message, TestReport, UserProfile, Avatar, AssessmentType, LearningConfig, LessonPlan } from './types';
-import { generateFinalReport, preloadAvatarAudio, generateLearningResponse, voiceService, generateLessonPlan, preloadLessonAssets } from './services/geminiService';
-import { Loader2, Play, ChevronRight, ArrowLeft, Languages, MessageSquare, FileText, Download, Image as ImageIcon, Printer, GraduationCap } from 'lucide-react';
+import { TestStage, Message, TestReport, UserProfile, Avatar, AssessmentType, LearningConfig } from './types';
+import { generateFinalReport, preloadAvatarAudio, generateLearningResponse, voiceService } from './services/geminiService';
+import { Loader2, Play, ChevronRight, ArrowLeft, Languages, MessageSquare, FileText, Download, Image as ImageIcon, Printer, ExternalLink } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 const App: React.FC = () => {
   const [stage, setStage] = useState<TestStage>(TestStage.WELCOME);
+  const [isWeChat, setIsWeChat] = useState(false);
+
+  // Detect WeChat Browser
+  useEffect(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('micromessenger')) {
+        setIsWeChat(true);
+    }
+  }, []);
   
   // Assessment State
   const [report, setReport] = useState<TestReport | null>(null);
@@ -23,7 +31,6 @@ const App: React.FC = () => {
   // Learning State
   const [learningConfig, setLearningConfig] = useState<LearningConfig | null>(null);
   const [initialLearningMessage, setInitialLearningMessage] = useState<Message | undefined>(undefined);
-  const [lessonPlan, setLessonPlan] = useState<LessonPlan | null>(null); // New State
 
   // Common State
   const [selectedAvatar, setSelectedAvatar] = useState<Avatar | null>(null);
@@ -65,53 +72,35 @@ const App: React.FC = () => {
       setLearningConfig(config);
       setSelectedAvatar(avatar);
       setStage(TestStage.LEARN_LOADING);
-      // New: Go to Lesson Preview First
-      startLoading(avatar, TestStage.LESSON_PREVIEW, config);
+      // Pass config to loader
+      startLoading(avatar, TestStage.LEARNING, config);
   };
 
   // --- Common Loading Logic ---
   const startLoading = async (avatar: Avatar, nextStage: TestStage, learningCfg?: LearningConfig) => {
     setIsPreloadComplete(false);
     setInitialLearningMessage(undefined); // Reset
-    setLessonPlan(null); // Reset
     setLoadingProgress(5);
     
     try {
         setLoadingProgress(10);
         
         // 1. Preload Avatar standard audio (Intro/Conclusion)
+        // Always preload for HQ experience
         await preloadAvatarAudio(avatar, (pct) => {
-           setLoadingProgress(10 + Math.floor(pct * 0.3)); // Up to 40%
+           setLoadingProgress(10 + Math.floor(pct * 0.4)); // Up to 50%
         });
 
-        // 2. If Learning Mode, Generate Lesson Plan & Intro
-        if ((nextStage === TestStage.LEARNING || nextStage === TestStage.LESSON_PREVIEW) && learningCfg) {
-             setLoadingProgress(45);
+        // 2. If Learning Mode, Generate and Preload Intro Context
+        if (nextStage === TestStage.LEARNING && learningCfg) {
+             setLoadingProgress(55);
              
-             // Step A: Generate Lesson Plan (Parallel with Intro Gen if possible, but sequential for simplicity)
-             const plan = await generateLessonPlan(learningCfg);
-             setLessonPlan(plan);
-             setLoadingProgress(70);
-
-             // Step B: One-click Pre-download of Audio Assets
-             // This ensures no long loading times during the actual lesson
-             // NOTE: If plan was already cached and downloaded via "Download All", this step is instant.
-             // SKIPPED: As per user request, do not auto-download audio assets for preview materials to speed up entry.
-             // if (learningCfg.mode === 'TOPIC' || learningCfg.mode === 'CUSTOM') {
-             //     await preloadLessonAssets(plan, avatar, (pct) => {
-             //         // Map 0-100 of audio load to 70-85 of total load
-             //         setLoadingProgress(70 + Math.floor(pct * 0.15));
-             //     });
-             // }
-             
-             // Jump progress directly since we skipped the heavy download
-             setLoadingProgress(85);
-
-             // Step C: Generate the opening Text (LLM)
+             // Step A: Generate the opening Text (LLM) - Always needed
              const opening = await generateLearningResponse([], learningCfg, avatar, 0);
-             setLoadingProgress(90);
+             setLoadingProgress(75);
 
-             // Step D: Preload the Audio (TTS)
+             // Step B: Preload the Audio (TTS)
+             // Always preload specific intro text
              await voiceService.preloadSpecificText(opening.text, avatar);
              
              setInitialLearningMessage({
@@ -130,33 +119,27 @@ const App: React.FC = () => {
         setLoadingProgress(100);
         setIsPreloadComplete(true);
     } catch (e) {
-        console.error("Preparation failed", e);
+        console.error("Audio preparation failed", e);
         setIsPreloadComplete(true);
     }
   };
 
   const handleStartSession = () => {
-      // Transition based on current Loading Context
-      // If we have a Lesson Plan, go to Preview first
-      if (lessonPlan && stage === TestStage.LEARN_LOADING) {
-          setStage(TestStage.LESSON_PREVIEW);
-      } else {
-          if (stage === TestStage.LOADING) setStage(TestStage.TESTING);
-          if (stage === TestStage.LEARN_LOADING) setStage(TestStage.LEARNING);
-      }
-  };
-
-  const handleLessonPreviewComplete = () => {
-      setStage(TestStage.LEARNING);
+      if (stage === TestStage.LOADING) setStage(TestStage.TESTING);
+      if (stage === TestStage.LEARN_LOADING) setStage(TestStage.LEARNING);
   };
 
   const handleSessionComplete = async (history: Message[], forceReport: boolean = false) => {
     setTestHistory(history);
     setTestFinishedManually(true);
     
+    // Check if learning mode and if turns are sufficient
+    // ONLY check threshold if NOT forced
     if (!forceReport && learningConfig) {
+        // Calculate user turns (approx half of messages)
         const userTurns = history.filter(m => m.role === 'user').length;
         if (userTurns < 6) {
+            // Less than 6 turns, skip report generation
             alert("Session too short for analysis report. Showing transcript only. \n会话过短无法生成报告，仅显示记录。");
             setStage(TestStage.TRANSCRIPT);
             return;
@@ -165,12 +148,15 @@ const App: React.FC = () => {
 
     setStage(TestStage.ANALYZING);
     try {
+      // Pass the duration to generateFinalReport to determine vocab quantity
       const result = await generateFinalReport(history, learningConfig?.duration);
       
+      // Post-process for Learning Mode
       if (stage === TestStage.LEARNING || learningConfig) {
           result.isLearningReport = true;
           result.simpleAnalysis = "Great practice! Review your detailed analysis below. (练习很棒！请查看下方的详细分析。)";
           
+          // Inject Topic Title
           if (learningConfig) {
              if (learningConfig.mode === 'TOPIC' && learningConfig.topic) {
                  result.topicTitle = `${learningConfig.topic.titleEn} ${learningConfig.topic.titleCn}`;
@@ -190,13 +176,12 @@ const App: React.FC = () => {
   };
 
   const handleRestart = (force: boolean = false) => {
-    if (!force && (stage === TestStage.TRANSCRIPT || stage === TestStage.REPORT || stage === TestStage.TESTING || stage === TestStage.LEARNING || stage === TestStage.LESSON_PREVIEW)) {
+    if (!force && (stage === TestStage.TRANSCRIPT || stage === TestStage.REPORT || stage === TestStage.TESTING || stage === TestStage.LEARNING)) {
         if (!window.confirm("Return to home? Unsaved progress will be lost. / 返回首页？未保存的进度将丢失。")) return;
     }
     setReport(null);
     setUserProfile(null);
     setLearningConfig(null);
-    setLessonPlan(null); // Reset
     setSelectedAvatar(null);
     setTestHistory([]);
     setTestFinishedManually(false);
@@ -208,6 +193,8 @@ const App: React.FC = () => {
     if (report) {
         setStage(TestStage.REPORT);
     } else {
+        // If no report exists (e.g. short learning session or manual review without report),
+        // Back acts as Exit to Home
         if (window.confirm("Return to Home? / 返回首页？")) {
              handleRestart(true);
         }
@@ -217,9 +204,11 @@ const App: React.FC = () => {
   const handleSaveTranscriptImage = async () => {
     if (!transcriptRef.current) return;
     
+    // Create a deep clone to manipulate for capture without affecting UI
     const originalElement = transcriptRef.current;
     const clone = originalElement.cloneNode(true) as HTMLElement;
     
+    // Style the clone to expand fully
     clone.style.height = 'auto';
     clone.style.maxHeight = 'none';
     clone.style.overflow = 'visible';
@@ -227,14 +216,14 @@ const App: React.FC = () => {
     clone.style.position = 'absolute';
     clone.style.left = '-9999px';
     clone.style.top = '0';
-    clone.style.background = '#f8fafc';
-    clone.style.padding = '40px'; 
+    clone.style.background = '#f8fafc'; // Match bg-slate-50
+    clone.style.padding = '40px'; // Add some padding for the image
     
     document.body.appendChild(clone);
     
     try {
         const canvas = await html2canvas(clone, {
-            scale: 2, 
+            scale: 2, // Higher quality
             useCORS: true,
             logging: false,
             backgroundColor: '#f8fafc'
@@ -259,6 +248,23 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
       
+      {isWeChat && (
+        <div className="fixed inset-0 z-[9999] bg-gray-900 flex flex-col items-center justify-center p-6 text-center text-white">
+            <div className="w-20 h-20 bg-gray-800 rounded-2xl flex items-center justify-center mb-6">
+                <ExternalLink size={40} className="text-gray-400"/>
+            </div>
+            <h2 className="text-2xl font-bold mb-4">Please Open in Browser</h2>
+            <p className="text-gray-400 mb-8 leading-relaxed max-w-xs mx-auto">
+                WeChat blocks microphone access. <br/>
+                Tap the <span className="font-bold text-white">...</span> menu and select <br/>
+                <span className="font-bold text-white">"Open in Browser"</span>
+            </p>
+            <div className="animate-bounce mt-4">
+                <ArrowLeft className="rotate-90" size={32}/>
+            </div>
+        </div>
+      )}
+      
       {stage === TestStage.WELCOME && (
           <WelcomeScreen onStartAssessment={startAssessmentSetup} onStartLearning={startLearningSetup} />
       )}
@@ -272,7 +278,7 @@ const App: React.FC = () => {
       )}
 
       {(stage === TestStage.LOADING || stage === TestStage.LEARN_LOADING) && (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-emerald-50 p-6 text-center animate-fadeIn">
+          <div className="min-h-screen flex flex-col items-center justify-center bg-brand-50 p-6 text-center animate-fadeIn">
               <div className="relative w-32 h-32 mb-8">
                 <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
                 <div className={`absolute inset-0 border-4 rounded-full transition-all duration-300 ${stage === TestStage.LEARN_LOADING ? 'border-emerald-600' : 'border-brand-600'}`} style={{ clipPath: `inset(${100 - loadingProgress}% 0 0 0)` }}></div>
@@ -281,7 +287,7 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-bold text-gray-800 mb-2">{isPreloadComplete ? 'Ready!' : 'Preparing...'}</h2>
               <p className="text-gray-500 mb-6 text-sm">
                   {stage === TestStage.LEARN_LOADING 
-                    ? "Generating Lesson Plan & Intro..." 
+                    ? "Preloading high-quality neural voice for smoothness..." 
                     : "Initializing session..."}
               </p>
               {isPreloadComplete && (
@@ -289,20 +295,10 @@ const App: React.FC = () => {
                     onClick={handleStartSession} 
                     className={`${stage === TestStage.LEARN_LOADING ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-brand-600 hover:bg-brand-700'} text-white font-bold py-5 px-10 rounded-2xl shadow-2xl flex items-center gap-3 transition-all transform hover:-translate-y-1`}
                   >
-                      {stage === TestStage.LEARN_LOADING ? <GraduationCap size={24}/> : <Play size={24} fill="currentColor" />} 
-                      {stage === TestStage.LEARN_LOADING ? 'Start Preview / 开始预习' : 'Enter Exam Room / 进入考场'}
+                      <Play size={24} fill="currentColor" /> {stage === TestStage.LEARN_LOADING ? 'Start Practice / 开始练习' : 'Enter Exam Room / 进入考场'}
                   </button>
               )}
           </div>
-      )}
-
-      {stage === TestStage.LESSON_PREVIEW && lessonPlan && selectedAvatar && (
-          <LessonPreviewScreen 
-            plan={lessonPlan} 
-            avatar={selectedAvatar} 
-            onStart={handleLessonPreviewComplete} 
-            onBack={() => setStage(TestStage.LEARN_SETUP)}
-          />
       )}
 
       {stage === TestStage.TESTING && userProfile && selectedAvatar && (
@@ -388,5 +384,4 @@ const App: React.FC = () => {
     </div>
   );
 };
-
 export default App;

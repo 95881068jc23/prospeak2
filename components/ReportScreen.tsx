@@ -2,11 +2,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { TestReport, AnalysisItem, Message } from '../types';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
-import { Download, CheckCircle, AlertCircle, Home, Image as ImageIcon, Sparkles, Loader2, ListChecks, Ear, BookA, Brackets, Mic, Wind, Star, BrainCircuit, Quote, Key, Trophy, Medal, FileText, Heart } from 'lucide-react';
+import { Download, CheckCircle, AlertCircle, Home, Image as ImageIcon, Sparkles, Loader2, ListChecks, Ear, BookA, Brackets, Mic, Wind, Star, BrainCircuit, Quote, Key, Trophy, Medal, FileText, Heart, Play } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { generateDetailedTranscriptAnalysis } from '../services/geminiService';
+import { generateDetailedTranscriptAnalysis, voiceService } from '../services/geminiService';
 import { storageService } from '../services/storageService';
+import { AVATARS } from '../constants';
 
 interface Props {
   report: TestReport;
@@ -53,6 +54,13 @@ export const ReportScreen: React.FC<Props> = ({ report, onRestart, history }) =>
   const [isGeneratingDetails, setIsGeneratingDetails] = useState(false);
   const [mistakesAdded, setMistakesAdded] = useState(0);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [isPlaying, setIsPlaying] = useState<string | null>(null);
+  // Tap to Play Overlay
+  const [showPlayOverlay, setShowPlayOverlay] = useState<{show: boolean, text?: string, id?: string}>({ show: false });
+  
+  // Default avatar fallback
+  const avatar = AVATARS.find(a => a.id === '0')!;
+
 
   useEffect(() => {
     // Sync initial favorites
@@ -193,6 +201,44 @@ export const ReportScreen: React.FC<Props> = ({ report, onRestart, history }) =>
     }
   };
 
+  const playAudio = (text: string, id: string) => {
+    if (isPlaying === id) {
+        voiceService.stop();
+        setIsPlaying(null);
+        return;
+    }
+
+    voiceService.speak(
+        text, 
+        avatar, 
+        () => setIsPlaying(id), 
+        () => setIsPlaying(null),
+        false, // Use Native if possible
+        (err) => {
+             console.warn("Report Audio Failed", err);
+             // If autoplay blocked
+             if (err.includes('Autoplay Blocked') || err.includes('interact')) {
+                 setIsPlaying(null);
+                 setShowPlayOverlay({ show: true, text, id });
+             } else {
+                 setIsPlaying(null);
+                 // Fallback to Standard
+                 voiceService.speak(text, avatar, () => setIsPlaying(id), () => setIsPlaying(null), true);
+             }
+        }
+    );
+  };
+
+  const handleManualPlay = () => {
+      if (showPlayOverlay.text && showPlayOverlay.id) {
+          const { text, id } = showPlayOverlay;
+          setShowPlayOverlay({ show: false });
+          playAudio(text, id);
+      }
+  };
+
+  // Sort suggestions: Key Improvements first
+
   const sortedSuggestions = report.suggestions ? [...report.suggestions].sort((a, b) => {
     return (a.isKeyImprovement === b.isKeyImprovement) ? 0 : a.isKeyImprovement ? -1 : 1;
   }) : [];
@@ -225,7 +271,27 @@ export const ReportScreen: React.FC<Props> = ({ report, onRestart, history }) =>
         </div>
       </div>
 
+      {/* Autoplay Blocked Overlay */}
+      {showPlayOverlay.show && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center animate-bounce-in">
+                    <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-600">
+                        <Play size={32} fill="currentColor" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Tap to Play Audio</h3>
+                    <p className="text-gray-500 mb-6">Mobile browsers require a tap to start audio playback.</p>
+                    <button 
+                        onClick={handleManualPlay}
+                        className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 active:scale-95 transition-all"
+                    >
+                        Play Audio
+                    </button>
+                </div>
+            </div>
+      )}
+
       <div className="max-w-4xl mx-auto mb-4 md:mb-6 px-4 flex flex-col md:flex-row justify-between items-center no-print relative z-[100] gap-3">
+
         <button 
             onClick={handleHomeClick}
             className="w-full md:w-auto flex items-center justify-center space-x-2 bg-gray-200 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-300 transition-colors font-medium text-sm shadow-sm"

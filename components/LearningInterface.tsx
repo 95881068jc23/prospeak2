@@ -41,6 +41,9 @@ export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config,
   // Error Feedback
   const [voiceErrorMsg, setVoiceErrorMsg] = useState<string | null>(null);
 
+  // Tap to Play Overlay
+  const [showPlayOverlay, setShowPlayOverlay] = useState<{show: boolean, text?: string}>({ show: false });
+
   // Phase management: ACTIVE -> CONCLUSION_PLAYING -> CONCLUSION_DONE -> FINISHED
   const [phase, setPhase] = useState<'ACTIVE' | 'CONCLUSION_PLAYING' | 'CONCLUSION_DONE' | 'FINISHED'>('ACTIVE');
 
@@ -181,6 +184,14 @@ export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config,
         useLocal, 
         (err) => {
             console.warn("Audio failed", err);
+            
+            // If autoplay blocked, show overlay
+            if (err.includes('Autoplay Blocked') || err.includes('interact')) {
+                setIsPlaying(false);
+                setShowPlayOverlay({ show: true, text });
+                return;
+            }
+
             // If Native voice failed, switch to Standard and notify user
             if (!useLocal) {
                 setCurrentVoiceType('STANDARD');
@@ -202,6 +213,13 @@ export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config,
   const handlePlayBetterExpression = (text: string) => {
       if (isPlaying) { voiceService.stop(); setIsPlaying(false); return; }
       playQuestionAudio(text);
+  };
+
+  const handleManualPlay = () => {
+      if (showPlayOverlay.text) {
+          setShowPlayOverlay({ show: false });
+          playQuestionAudio(showPlayOverlay.text);
+      }
   };
 
   const togglePlayback = () => {
@@ -413,6 +431,25 @@ export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config,
 
   return (
     <div className="min-h-screen bg-emerald-50/30 flex flex-col relative overflow-hidden">
+        {/* Autoplay Blocked Overlay */}
+        {showPlayOverlay.show && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center animate-bounce-in">
+                    <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-600">
+                        <Play size={32} fill="currentColor" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Tap to Play Audio</h3>
+                    <p className="text-gray-500 mb-6">Mobile browsers require a tap to start audio playback.</p>
+                    <button 
+                        onClick={handleManualPlay}
+                        className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 active:scale-95 transition-all"
+                    >
+                        Play Audio
+                    </button>
+                </div>
+            </div>
+        )}
+
         {/* Exit Modal */}
         {showExitModal && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
