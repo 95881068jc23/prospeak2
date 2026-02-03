@@ -16,6 +16,23 @@ interface Props {
 
 const CEFR_LEVELS = ['PreA1', 'A1', 'A2', 'A2+', 'B1', 'B1+', 'B2', 'B2+', 'C1', 'C1+'];
 
+// Helper to detect supported MIME type for Android/iOS compatibility
+const getSupportedMimeType = (): string => {
+    const types = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/ogg;codecs=opus'
+    ];
+    for (const type of types) {
+        if (MediaRecorder.isTypeSupported(type)) {
+            return type;
+        }
+    }
+    return ''; // Fallback to browser default
+};
+
 export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config, avatar, initialMessage }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -273,7 +290,10 @@ export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config,
       
       try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const mediaRecorder = new MediaRecorder(stream);
+          const mimeType = getSupportedMimeType();
+          const options = mimeType ? { mimeType } : undefined;
+          
+          const mediaRecorder = new MediaRecorder(stream, options);
           practiceRecorderRef.current = mediaRecorder;
           practiceChunksRef.current = [];
           
@@ -281,7 +301,9 @@ export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config,
           
           mediaRecorder.onstop = async () => {
               setIsPracticeProcessing(true);
-              const blob = new Blob(practiceChunksRef.current, { type: 'audio/webm' });
+              // Use the actual mime type determined by the browser
+              const finalMimeType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+              const blob = new Blob(practiceChunksRef.current, { type: finalMimeType });
               try {
                   const transcription = await transcribeAudio(blob);
                   const score = scorePronunciation(transcription, targetText);
@@ -319,7 +341,10 @@ export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config,
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mimeType = getSupportedMimeType();
+      const options = mimeType ? { mimeType } : undefined;
+
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
       recordStartTimeRef.current = Date.now();
@@ -329,7 +354,10 @@ export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config,
       mediaRecorder.onstop = async () => {
         if (Date.now() - recordStartTimeRef.current < 600) { setIsRecording(false); return; }
         setIsProcessing(true);
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        
+        // Use the actual mime type determined by the browser
+        const finalMimeType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+        const audioBlob = new Blob(chunksRef.current, { type: finalMimeType });
         const userAudioUrl = URL.createObjectURL(audioBlob); // Create local URL for playback
         
         try {
