@@ -348,7 +348,6 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
                                     )}
                                 </div>
                             </div>
-                            </div>
 
                             <div className="p-6 border-t bg-gray-50 rounded-b-2xl flex justify-end gap-3">
                                 <button onClick={() => setShowAddForm(false)} className="px-6 py-3 font-bold text-gray-500 hover:bg-gray-200 rounded-xl transition-colors">Cancel</button>
