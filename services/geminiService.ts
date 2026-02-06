@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { TestReport, Message, UserProfile, Avatar, AnalysisItem, SuggestionItem, LearningConfig, PlaybackSpeed, LessonPlan, Topic } from "../types";
+import { TestReport, Message, UserProfile, Avatar, AnalysisItem, SuggestionItem, LearningConfig, PlaybackSpeed, LessonPlan, Topic, UploadedFile } from "../types";
 import { ASSESSMENT_SCRIPTS } from "../constants";
 
 // Safe API Key retrieval
@@ -101,6 +101,64 @@ function cleanJson(text: string): string {
   }
   return text;
 }
+
+// --------------------------------------------------------------------------
+// Content Parsing (PPT/PDF to Text)
+// --------------------------------------------------------------------------
+
+export const parseCourseMaterials = async (files: UploadedFile[]): Promise<string> => {
+    if (!files || files.length === 0) return "";
+    
+    const ai = getAI();
+    try {
+        const parts = files.map(file => ({
+            inlineData: {
+                mimeType: file.mimeType || 'application/pdf',
+                data: file.data
+            }
+        }));
+
+        const prompt = `
+        Analyze these course materials (PPT/PDF/Images).
+        
+        TASK: Extract a structured course context for an English tutor.
+        Output Format (Plain Text):
+        
+        [Topic Summary]
+        (Brief overview of what this is about)
+
+        [Key Vocabulary]
+        (List of important terms found in the slides)
+
+        [Key Scenarios / Dialogue Context]
+        (Describe specific situations, roleplays, or interactions mentioned)
+
+        [Key Knowledge Points]
+        (Bullet points of the core content)
+
+        [Objection Handling / Q&A]
+        (If present, list common questions and answers)
+
+        INSTRUCTION: Ignore visual layout details. Focus on the TEXT content and TEACHING VALUE.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash-exp", // Use 2.0 Flash for Multimodal
+            contents: [{ 
+                role: 'user', 
+                parts: [
+                    ...parts,
+                    { text: prompt }
+                ] 
+            }]
+        });
+
+        return response.text.trim();
+    } catch (e) {
+        console.error("Material parsing failed", e);
+        return "Error parsing materials. Please try pasting text manually.";
+    }
+};
 
 // --------------------------------------------------------------------------
 // Audio & Voice Service (Refactored for Pitch Preservation)
