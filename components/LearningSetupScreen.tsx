@@ -266,6 +266,18 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
   // Enterprise Mode State
   const [selectedDepartment, setSelectedDepartment] = useState<string>('Sales');
   const [enterpriseTopics, setEnterpriseTopics] = useState<Topic[]>([]);
+  const [enterpriseSearchQuery, setEnterpriseSearchQuery] = useState('');
+  const [enterpriseLevel, setEnterpriseLevel] = useState<string>('A1');
+
+  const filteredEnterpriseTopics = useMemo(() => {
+      return enterpriseTopics.filter(t => {
+          const matchesSearch = !enterpriseSearchQuery.trim() || 
+              t.titleEn.toLowerCase().includes(enterpriseSearchQuery.toLowerCase()) || 
+              t.titleCn.includes(enterpriseSearchQuery);
+          const matchesLevel = !enterpriseLevel || t.level === enterpriseLevel;
+          return matchesSearch && matchesLevel;
+      });
+  }, [enterpriseTopics, enterpriseSearchQuery, enterpriseLevel]);
 
   // Batch Selection State
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -790,18 +802,54 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
                                 </div>
                              </div>
 
+                             {/* Search Bar */}
+                             <div className="relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input 
+                                    type="text" 
+                                    value={enterpriseSearchQuery}
+                                    onChange={(e) => setEnterpriseSearchQuery(e.target.value)}
+                                    placeholder="Search courses / 搜索课程"
+                                    className="w-full pl-11 pr-10 py-3 bg-white border border-gray-200 rounded-xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-sm"
+                                />
+                                {enterpriseSearchQuery && (
+                                    <button 
+                                        onClick={() => setEnterpriseSearchQuery('')}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 bg-gray-200 hover:bg-gray-300 rounded-full text-gray-600 transition-colors"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                             </div>
+
+                             {/* Level Selector */}
+                             <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700">Select Level / 选择等级</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {CEFR_LEVELS.map(lvl => (
+                                        <button 
+                                            key={lvl}
+                                            onClick={() => { setEnterpriseLevel(lvl); setSelectedTopicId(''); }}
+                                            className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${enterpriseLevel === lvl ? 'bg-indigo-100 border-indigo-500 text-indigo-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                        >
+                                            {lvl}
+                                        </button>
+                                    ))}
+                                </div>
+                             </div>
+
                              {/* Course Grid */}
                              <div>
                                 <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-                                    <BriefcaseBusiness size={16}/> Available Courses / 可选课程 ({enterpriseTopics.length})
+                                    <BriefcaseBusiness size={16}/> Available Courses / 可选课程 ({filteredEnterpriseTopics.length})
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {enterpriseTopics.map(t => (
+                                    {filteredEnterpriseTopics.map(t => (
                                         <TopicCard 
                                             key={t.id} 
                                             topic={t} 
                                             isSelected={selectedTopicId === t.id} 
-                                            searchQuery="" 
+                                            searchQuery={enterpriseSearchQuery} 
                                             onSelect={setSelectedTopicId} 
                                             downloadStatus={downloadStates[t.id] || 'idle'}
                                             onDownload={(e) => handleSingleDownload(e, t)}
@@ -809,13 +857,13 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
                                             isChecked={false}
                                         />
                                     ))}
-                                    {enterpriseTopics.length === 0 && (
+                                    {filteredEnterpriseTopics.length === 0 && (
                                         <div className="col-span-2 py-16 text-center bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center">
                                             <div className="bg-gray-50 p-4 rounded-full mb-3">
                                                 <Building2 size={32} className="text-gray-300"/>
                                             </div>
-                                            <p className="text-gray-500 font-medium">No courses found for {selectedDepartment}.</p>
-                                            <p className="text-xs text-gray-400 mt-1">该部门暂无定制课程</p>
+                                            <p className="text-gray-500 font-medium">No courses found matching criteria.</p>
+                                            <p className="text-xs text-gray-400 mt-1">未找到匹配的课程</p>
                                         </div>
                                     )}
                                 </div>
