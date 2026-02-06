@@ -143,7 +143,7 @@ export const parseCourseMaterials = async (files: UploadedFile[]): Promise<strin
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-exp", // Use 2.0 Flash for Multimodal
+            model: "gemini-1.5-flash", // Use stable 1.5 Flash for Multimodal
             contents: [{ 
                 role: 'user', 
                 parts: [
