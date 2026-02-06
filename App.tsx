@@ -6,6 +6,7 @@ import { TestInterface } from './components/TestInterface';
 import { LearningSetupScreen } from './components/LearningSetupScreen';
 import { LearningInterface } from './components/LearningInterface';
 import { ReportScreen } from './components/ReportScreen';
+import { EnterpriseCourseManager } from './components/EnterpriseCourseManager';
 import { TestStage, Message, TestReport, UserProfile, Avatar, AssessmentType, LearningConfig } from './types';
 import { generateFinalReport, preloadAvatarAudio, generateLearningResponse, voiceService } from './services/geminiService';
 import { Loader2, Play, ChevronRight, ArrowLeft, Languages, MessageSquare, FileText, Download, Image as ImageIcon, Printer, ExternalLink } from 'lucide-react';
@@ -266,7 +267,15 @@ const App: React.FC = () => {
       )}
       
       {stage === TestStage.WELCOME && (
-          <WelcomeScreen onStartAssessment={startAssessmentSetup} onStartLearning={startLearningSetup} />
+          <WelcomeScreen 
+            onStartAssessment={startAssessmentSetup} 
+            onStartLearning={startLearningSetup} 
+            onOpenAdmin={() => setStage(TestStage.ADMIN_MANAGER)}
+          />
+      )}
+      
+      {stage === TestStage.ADMIN_MANAGER && (
+          <EnterpriseCourseManager onBack={() => setStage(TestStage.WELCOME)} />
       )}
       
       {stage === TestStage.SETUP && (

@@ -15,13 +15,15 @@ export enum TestStage {
   LEARNING = 'LEARNING',
   LEARN_REPORT = 'LEARN_REPORT',
   // Hub
-  STUDENT_HUB = 'STUDENT_HUB'
+  STUDENT_HUB = 'STUDENT_HUB',
+  // Admin
+  ADMIN_MANAGER = 'ADMIN_MANAGER'
 }
 
 export type AssessmentType = 'INITIAL_REGULAR' | 'INITIAL_DEEP' | 'STAGE_REGULAR' | 'STAGE_CUSTOM' | 'SPEED_RUN';
 
 export type AppMode = 'ASSESSMENT' | 'LEARNING';
-export type LearningMode = 'TOPIC' | 'CUSTOM';
+export type LearningMode = 'TOPIC' | 'CUSTOM' | 'ENTERPRISE';
 export type LearningDuration = 'LIGHT' | 'STANDARD' | 'DEEP'; // 10m/12t, 15m/20t, 25m/35t
 export type VoiceType = 'HQ' | 'STANDARD';
 export type PlaybackSpeed = 0.75 | 1.0 | 1.25;
@@ -68,6 +70,11 @@ export interface Topic {
   category: 'LIFE' | 'BUSINESS' | 'ZERO_BASIS';
   level: string;
   description?: string;
+  // Enterprise fields
+  isEnterprise?: boolean;
+  department?: string;
+  enterpriseId?: string;
+  pptContext?: string; // Content extracted from PPT
 }
 
 // New Interface for Lesson Plan

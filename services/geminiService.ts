@@ -693,6 +693,11 @@ export const generateLearningResponse = async (
         targetVocabContext = `Target Vocabulary: ${vocabList}. Target Sentences: ${sentList}. Try to weave these into your questions naturally.`;
     }
 
+    let enterpriseContext = "";
+    if (config.topic?.pptContext) {
+        enterpriseContext = `\nENTERPRISE COURSE MATERIAL (PPT Content):\n"${config.topic.pptContext}"\n\nINSTRUCTION: You are teaching this specific material. Use the scenarios, objections, and key points found in the material for your questions and feedback. Ensure the student masters this specific content.`;
+    }
+
     const bilingualInstruction = config.allowBilingual
         ? `**IMPORTANT**: BILINGUAL MODE ACTIVE. Provide Chinese feedback.`
         : "**IMPORTANT**: Keep responses primarily in English.";
@@ -702,9 +707,10 @@ export const generateLearningResponse = async (
     ${specificPersonaGuide}
 
     ### CONTEXT
-    Topic: ${config.mode === 'TOPIC' ? config.topic?.titleEn : config.customContext?.focusArea}.
+    Topic: ${(config.mode === 'TOPIC' || config.mode === 'ENTERPRISE') ? config.topic?.titleEn : config.customContext?.focusArea}.
     Student Level: ${activeLevel}.
     ${targetVocabContext}
+    ${enterpriseContext}
     
     ### CRITICAL RULES (MUST FOLLOW)
     1. **ONE QUESTION ONLY**: You must ask **EXACTLY ONE** follow-up question at the end. 
@@ -789,17 +795,23 @@ export const generateLearningResponse = async (
 };
 
 export const generateLessonPlan = async (config: LearningConfig): Promise<LessonPlan> => {
-    if (config.mode === 'TOPIC' && config.topic) {
+    if ((config.mode === 'TOPIC' || config.mode === 'ENTERPRISE') && config.topic) {
         const key = `TOPIC_${config.topic.id}_${config.level}`;
         const cached = isPlanCached(config.topic.id, config.level);
         if (cached) return getStoredPlans()[key];
     }
 
+    const pptContext = config.topic?.pptContext || "";
+    const pptInstruction = pptContext 
+        ? `IMPORTANT: This is a CUSTOM ENTERPRISE COURSE based on uploaded PPTs. You MUST generate content based on the following PPT/Context material:\n"${pptContext}"\nExtract key terms, scenarios, and knowledge strictly from this material.` 
+        : "";
+
     const ai = getAI();
     const prompt = `
     Create an English Lesson Plan.
-    Topic: ${config.mode === 'TOPIC' ? config.topic?.titleEn : config.customContext?.focusArea}.
+    Topic: ${(config.mode === 'TOPIC' || config.mode === 'ENTERPRISE') ? config.topic?.titleEn : config.customContext?.focusArea}.
     Level: ${config.level}.
+    ${pptInstruction}
     
     REQUIREMENTS:
     1. vocabulary: Generate EXACTLY 10 items. Include 'exampleCn' (Chinese translation of example).

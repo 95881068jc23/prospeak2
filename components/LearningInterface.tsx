@@ -545,7 +545,7 @@ export const LearningInterface: React.FC<Props> = ({ onComplete, onQuit, config,
             <div className="flex flex-col flex-1 min-w-0 mr-2">
                 <div className="flex items-center gap-2 text-emerald-800 font-bold min-w-0 mb-1">
                     <GraduationCap size={18} className="shrink-0"/>
-                    <span className="block break-words line-clamp-2 leading-tight">{config.mode === 'TOPIC' ? config.topic?.titleEn : 'Custom Practice'}</span>
+                    <span className="block break-words line-clamp-2 leading-tight">{(config.mode === 'TOPIC' || config.mode === 'ENTERPRISE') ? config.topic?.titleEn : 'Custom Practice'}</span>
                 </div>
                 
                 {/* Level Adjuster - Dynamic Difficulty */}

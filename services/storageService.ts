@@ -1,8 +1,69 @@
 
-import { FavoriteItem, MistakeItem } from '../types';
+import { FavoriteItem, MistakeItem, Topic } from '../types';
 
 const FAVORITES_KEY = 'marvel_prospeak_favorites';
 const MISTAKES_KEY = 'marvel_prospeak_mistakes';
+const ENTERPRISE_KEY = 'marvel_prospeak_enterprise_courses';
+
+// Pre-load some demo enterprise data if empty
+const initEnterpriseDemo = () => {
+    try {
+        if (!localStorage.getItem(ENTERPRISE_KEY)) {
+            const demos: Topic[] = [
+                {
+                    id: 'ent-sales-01',
+                    titleEn: 'Q4 Product Pitch',
+                    titleCn: 'Q4季度产品报价话术',
+                    category: 'BUSINESS',
+                    level: 'B2',
+                    isEnterprise: true,
+                    department: 'Sales',
+                    enterpriseId: 'marvel-corp',
+                    pptContext: `
+                    Key Selling Points: 
+                    1. AI-driven efficiency: 30% faster workflow.
+                    2. Cost reduction: Save $2000 per seat annually.
+                    3. Seamless integration with existing CRM.
+                    
+                    Objection Handling:
+                    - "It's too expensive": Highlight ROI within 3 months.
+                    - "We are happy with current provider": Focus on unique AI features they lack.
+                    
+                    Closing Techniques:
+                    - Trial close: "If we can meet your budget, would you sign today?"
+                    - Assumptive close: "When would you like to start implementation?"
+                    `
+                },
+                {
+                    id: 'ent-rd-01',
+                    titleEn: 'Agile Scrum Daily Standup',
+                    titleCn: '敏捷开发每日站会',
+                    category: 'BUSINESS',
+                    level: 'B1',
+                    isEnterprise: true,
+                    department: 'R&D',
+                    enterpriseId: 'marvel-corp',
+                    pptContext: `
+                    Structure of Standup:
+                    1. What did you do yesterday?
+                    2. What will you do today?
+                    3. Any blockers?
+                    
+                    Key Vocabulary:
+                    - Sprint, Backlog, Blocker, Deployment, PR (Pull Request), Code Review.
+                    
+                    Scenario:
+                    - Reporting a delay due to API dependency.
+                    - Asking for help on a bug.
+                    `
+                }
+            ];
+            localStorage.setItem(ENTERPRISE_KEY, JSON.stringify(demos));
+        }
+    } catch {}
+};
+
+initEnterpriseDemo();
 
 export const storageService = {
     // --- FAVORITES ---
@@ -58,5 +119,40 @@ export const storageService = {
     removeMistake: (id: string) => {
         const list = storageService.getMistakes().filter(i => i.id !== id);
         localStorage.setItem(MISTAKES_KEY, JSON.stringify(list));
+    },
+
+    // --- ENTERPRISE COURSES ---
+    getEnterpriseCourses: (department?: string): Topic[] => {
+        try {
+            const data = localStorage.getItem(ENTERPRISE_KEY);
+            const all: Topic[] = data ? JSON.parse(data) : [];
+            if (department) {
+                return all.filter(t => t.department === department);
+            }
+            return all;
+        } catch { return []; }
+    },
+
+    getAllDepartments: (): string[] => {
+        const courses = storageService.getEnterpriseCourses();
+        const depts = new Set(courses.map(c => c.department || 'General'));
+        return Array.from(depts);
+    },
+
+    saveEnterpriseCourse: (topic: Topic) => {
+        const list = storageService.getEnterpriseCourses();
+        // Update if exists, else add
+        const idx = list.findIndex(t => t.id === topic.id);
+        if (idx >= 0) {
+            list[idx] = topic;
+        } else {
+            list.unshift(topic);
+        }
+        localStorage.setItem(ENTERPRISE_KEY, JSON.stringify(list));
+    },
+    
+    deleteEnterpriseCourse: (id: string) => {
+        const list = storageService.getEnterpriseCourses().filter(t => t.id !== id);
+        localStorage.setItem(ENTERPRISE_KEY, JSON.stringify(list));
     }
 };

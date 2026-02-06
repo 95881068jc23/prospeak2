@@ -7,9 +7,10 @@ import { StudentHub } from './StudentHub'; // New import
 interface Props {
   onStartAssessment: (type: AssessmentType) => void;
   onStartLearning: () => void;
+  onOpenAdmin: () => void;
 }
 
-export const WelcomeScreen: React.FC<Props> = ({ onStartAssessment, onStartLearning }) => {
+export const WelcomeScreen: React.FC<Props> = ({ onStartAssessment, onStartLearning, onOpenAdmin }) => {
   const [view, setView] = useState<'HOME' | 'ASSESSMENT_SELECT'>('HOME');
   const [showHub, setShowHub] = useState(false);
 
@@ -185,8 +186,9 @@ export const WelcomeScreen: React.FC<Props> = ({ onStartAssessment, onStartLearn
 
         {/* Info Footer */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl w-full text-xs md:text-sm text-gray-500">
-           <div className="text-center md:text-left">
-              © Marvel English. AI-Powered Education.
+           <div className="text-center md:text-left flex items-center justify-center md:justify-start gap-4">
+              <span>© Marvel English. AI-Powered Education.</span>
+              <button onClick={onOpenAdmin} className="text-gray-400 hover:text-indigo-600 font-bold transition-colors">Admin</button>
            </div>
            <div className="text-center md:text-right">
               Based on CEFR Standards.

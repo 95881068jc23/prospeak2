@@ -4,6 +4,7 @@ import { Avatar, LearningConfig, LearningMode, Topic, UploadedFile, LearningDura
 import { AVATARS, TOPICS_DB } from '../constants';
 import { BookOpen, PenTool, Clock, User, Briefcase, FileText, Upload, X, Image as ImageIcon, Check, PlayCircle, ArrowLeft, Target, Globe, ToggleLeft, ToggleRight, Sparkles, Zap, Mic2, Wifi, Search, ArrowRight, BarChart, MessageCircleQuestion, Tag, RefreshCcw, LayoutTemplate, BriefcaseBusiness, LibraryBig, Trash2, CloudDownload, DownloadCloud, Loader2, ListChecks, CheckSquare, Square, Coffee, Plane, Home, Users, Heart, Sun, Moon, Cloud, Music, Video, Camera, ShoppingBag, DollarSign, TrendingUp, Cpu, Activity, Utensils, MapPin, Calendar, Smile, MessageCircle, Handshake, Monitor, Smartphone, Dumbbell,  Shirt, Ticket, Gift, Film, GraduationCap, Building2, Car, Train, CreditCard, PieChart, Lightbulb, Brain, Laugh, Trophy, Leaf, Palette, Newspaper, Laptop, Tv } from 'lucide-react';
 import { voiceService, clearLessonPlanCache, isPlanCached, generateLessonPlan, preloadLessonAssets } from '../services/geminiService';
+import { storageService } from '../services/storageService';
 
 interface Props {
   onComplete: (config: LearningConfig, avatar: Avatar) => void;
@@ -262,6 +263,10 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
   const [selectedTopicId, setSelectedTopicId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Enterprise Mode State
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('Sales');
+  const [enterpriseTopics, setEnterpriseTopics] = useState<Topic[]>([]);
+
   // Batch Selection State
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
@@ -301,6 +306,16 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
       });
       setDownloadStates(newStates);
   }, [selectedLevel, selectedCategory]);
+
+  // Load Enterprise Courses
+  useEffect(() => {
+      if (mode === 'ENTERPRISE') {
+          const courses = storageService.getEnterpriseCourses(selectedDepartment);
+          setEnterpriseTopics(courses);
+          // Reset selection when department changes
+          setSelectedTopicId('');
+      }
+  }, [mode, selectedDepartment]);
 
   const toggleBatchSelection = (id: string) => {
       const next = new Set(selectedBatchIds);
@@ -562,11 +577,14 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
 
     const finalBilingual = overrideBilingual !== undefined ? overrideBilingual : allowBilingual;
 
-    if (mode === 'TOPIC') {
-        const topic = TOPICS_DB.find(t => t.id === selectedTopicId);
+    if (mode === 'TOPIC' || mode === 'ENTERPRISE') {
+        const topic = mode === 'TOPIC' 
+            ? TOPICS_DB.find(t => t.id === selectedTopicId)
+            : enterpriseTopics.find(t => t.id === selectedTopicId);
+            
         voiceService.ensureAudioContext();
         onComplete({
-            mode: 'TOPIC',
+            mode: mode,
             level: topic?.level || selectedLevel,
             duration: selectedDuration,
             voiceType: 'HQ', // Enforce HQ
@@ -599,8 +617,8 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
 
   const handleStartClick = () => {
       // Validation first
-      if (mode === 'TOPIC' && !selectedTopicId) {
-          alert("Please select a topic. / 请选择一个话题。");
+      if ((mode === 'TOPIC' || mode === 'ENTERPRISE') && !selectedTopicId) {
+          alert("Please select a topic/course. / 请选择一个话题或课程。");
           return;
       }
       if (mode === 'CUSTOM') {
@@ -731,7 +749,13 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
                             onClick={() => setMode('CUSTOM')}
                             className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center justify-center gap-2 ${mode === 'CUSTOM' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-100 hover:bg-white/10'}`}
                         >
-                            <PenTool size={16}/> Custom Practice / 定制练习
+                            <PenTool size={16}/> Custom / 定制
+                        </button>
+                        <button 
+                            onClick={() => setMode('ENTERPRISE')}
+                            className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center justify-center gap-2 ${mode === 'ENTERPRISE' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-100 hover:bg-white/10'}`}
+                        >
+                            <Building2 size={16}/> Enterprise / 部门
                         </button>
                     </div>
                 </div>
@@ -742,7 +766,62 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
                 <div className="flex-1 p-8 overflow-y-auto bg-gray-50/50">
                     
                     {/* Mode Specific Content */}
-                    {mode === 'TOPIC' ? (
+                    {mode === 'ENTERPRISE' ? (
+                        <div className="space-y-6 animate-fadeIn">
+                             {/* Department Selector */}
+                             <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm">
+                                <label className="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <Building2 size={14}/> Select Department / 选择部门
+                                </label>
+                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                    {['Sales', 'R&D', 'HR', 'Management'].map(dept => (
+                                        <button
+                                            key={dept}
+                                            onClick={() => setSelectedDepartment(dept)}
+                                            className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all border shadow-sm
+                                                ${selectedDepartment === dept 
+                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200' 
+                                                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300'}
+                                            `}
+                                        >
+                                            {dept}
+                                        </button>
+                                    ))}
+                                </div>
+                             </div>
+
+                             {/* Course Grid */}
+                             <div>
+                                <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                                    <BriefcaseBusiness size={16}/> Available Courses / 可选课程 ({enterpriseTopics.length})
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {enterpriseTopics.map(t => (
+                                        <TopicCard 
+                                            key={t.id} 
+                                            topic={t} 
+                                            isSelected={selectedTopicId === t.id} 
+                                            searchQuery="" 
+                                            onSelect={setSelectedTopicId} 
+                                            downloadStatus={downloadStates[t.id] || 'idle'}
+                                            onDownload={(e) => handleSingleDownload(e, t)}
+                                            isBatchMode={false}
+                                            isChecked={false}
+                                        />
+                                    ))}
+                                    {enterpriseTopics.length === 0 && (
+                                        <div className="col-span-2 py-16 text-center bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center">
+                                            <div className="bg-gray-50 p-4 rounded-full mb-3">
+                                                <Building2 size={32} className="text-gray-300"/>
+                                            </div>
+                                            <p className="text-gray-500 font-medium">No courses found for {selectedDepartment}.</p>
+                                            <p className="text-xs text-gray-400 mt-1">该部门暂无定制课程</p>
+                                        </div>
+                                    )}
+                                </div>
+                             </div>
+                        </div>
+                    ) : mode === 'TOPIC' ? (
                         <div className="space-y-6 animate-fadeIn">
                              {/* Search Bar */}
                              <div className="relative">
