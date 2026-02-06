@@ -17,7 +17,8 @@ const initEnterpriseDemo = () => {
                     category: 'BUSINESS',
                     level: 'B2',
                     isEnterprise: true,
-                    department: 'Sales',
+                    department: ['Sales'],
+                    subDepartment: ['Inside Sales'],
                     enterpriseId: 'marvel-corp',
                     pptContext: `
                     Key Selling Points: 
@@ -41,7 +42,8 @@ const initEnterpriseDemo = () => {
                     category: 'BUSINESS',
                     level: 'B1',
                     isEnterprise: true,
-                    department: 'R&D',
+                    department: ['R&D'],
+                    subDepartment: ['Backend', 'QA'],
                     enterpriseId: 'marvel-corp',
                     pptContext: `
                     Structure of Standup:
@@ -125,9 +127,18 @@ export const storageService = {
     getEnterpriseCourses: (department?: string): Topic[] => {
         try {
             const data = localStorage.getItem(ENTERPRISE_KEY);
-            const all: Topic[] = data ? JSON.parse(data) : [];
+            let all: Topic[] = data ? JSON.parse(data) : [];
+            
+            // Data Migration: Ensure department is array
+            all = all.map(t => {
+                if (typeof t.department === 'string') {
+                    return { ...t, department: [t.department] };
+                }
+                return t;
+            });
+
             if (department) {
-                return all.filter(t => t.department === department);
+                return all.filter(t => t.department?.includes(department));
             }
             return all;
         } catch { return []; }
@@ -135,7 +146,14 @@ export const storageService = {
 
     getAllDepartments: (): string[] => {
         const courses = storageService.getEnterpriseCourses();
-        const depts = new Set(courses.map(c => c.department || 'General'));
+        const depts = new Set<string>();
+        courses.forEach(c => {
+            if (Array.isArray(c.department)) {
+                c.department.forEach(d => depts.add(d));
+            } else if (typeof c.department === 'string') {
+                depts.add(c.department);
+            }
+        });
         return Array.from(depts);
     },
 

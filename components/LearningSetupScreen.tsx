@@ -270,13 +270,23 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
   const [enterpriseLevel, setEnterpriseLevel] = useState<string>('A1');
 
   const filteredEnterpriseTopics = useMemo(() => {
-      return enterpriseTopics.filter(t => {
+      const filtered = enterpriseTopics.filter(t => {
           const matchesSearch = !enterpriseSearchQuery.trim() || 
               t.titleEn.toLowerCase().includes(enterpriseSearchQuery.toLowerCase()) || 
               t.titleCn.includes(enterpriseSearchQuery);
           const matchesLevel = !enterpriseLevel || t.level === enterpriseLevel;
           return matchesSearch && matchesLevel;
       });
+
+      // Split into General and Role Specific
+      const general = filtered.filter(t => 
+          !t.subDepartment || t.subDepartment.length === 0 || t.subDepartment.includes('General')
+      );
+      const specific = filtered.filter(t => 
+          t.subDepartment && t.subDepartment.length > 0 && !t.subDepartment.includes('General')
+      );
+
+      return { general, specific, all: filtered };
   }, [enterpriseTopics, enterpriseSearchQuery, enterpriseLevel]);
 
   // Batch Selection State
@@ -839,34 +849,64 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
                              </div>
 
                              {/* Course Grid */}
-                             <div>
-                                <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-                                    <BriefcaseBusiness size={16}/> Available Courses / 可选课程 ({filteredEnterpriseTopics.length})
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {filteredEnterpriseTopics.map(t => (
-                                        <TopicCard 
-                                            key={t.id} 
-                                            topic={t} 
-                                            isSelected={selectedTopicId === t.id} 
-                                            searchQuery={enterpriseSearchQuery} 
-                                            onSelect={setSelectedTopicId} 
-                                            downloadStatus={downloadStates[t.id] || 'idle'}
-                                            onDownload={(e) => handleSingleDownload(e, t)}
-                                            isBatchMode={false}
-                                            isChecked={false}
-                                        />
-                                    ))}
-                                    {filteredEnterpriseTopics.length === 0 && (
-                                        <div className="col-span-2 py-16 text-center bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center">
-                                            <div className="bg-gray-50 p-4 rounded-full mb-3">
-                                                <Building2 size={32} className="text-gray-300"/>
-                                            </div>
-                                            <p className="text-gray-500 font-medium">No courses found matching criteria.</p>
-                                            <p className="text-xs text-gray-400 mt-1">未找到匹配的课程</p>
+                             <div className="space-y-8">
+                                {/* General Courses */}
+                                {filteredEnterpriseTopics.general.length > 0 && (
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                                            <BriefcaseBusiness size={16}/> General Courses / 通用课程 ({filteredEnterpriseTopics.general.length})
+                                        </h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {filteredEnterpriseTopics.general.map(t => (
+                                                <TopicCard 
+                                                    key={t.id} 
+                                                    topic={t} 
+                                                    isSelected={selectedTopicId === t.id} 
+                                                    searchQuery={enterpriseSearchQuery} 
+                                                    onSelect={setSelectedTopicId} 
+                                                    downloadStatus={downloadStates[t.id] || 'idle'}
+                                                    onDownload={(e) => handleSingleDownload(e, t)}
+                                                    isBatchMode={false}
+                                                    isChecked={false}
+                                                />
+                                            ))}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
+
+                                {/* Role Specific Courses */}
+                                {filteredEnterpriseTopics.specific.length > 0 && (
+                                    <div>
+                                        <h3 className="text-sm font-bold text-indigo-700 mb-4 flex items-center gap-2">
+                                            <Target size={16}/> Role Specific / 岗位定制 ({filteredEnterpriseTopics.specific.length})
+                                        </h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {filteredEnterpriseTopics.specific.map(t => (
+                                                <TopicCard 
+                                                    key={t.id} 
+                                                    topic={t} 
+                                                    isSelected={selectedTopicId === t.id} 
+                                                    searchQuery={enterpriseSearchQuery} 
+                                                    onSelect={setSelectedTopicId} 
+                                                    downloadStatus={downloadStates[t.id] || 'idle'}
+                                                    onDownload={(e) => handleSingleDownload(e, t)}
+                                                    isBatchMode={false}
+                                                    isChecked={false}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {filteredEnterpriseTopics.all.length === 0 && (
+                                    <div className="col-span-2 py-16 text-center bg-white rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center">
+                                        <div className="bg-gray-50 p-4 rounded-full mb-3">
+                                            <Building2 size={32} className="text-gray-300"/>
+                                        </div>
+                                        <p className="text-gray-500 font-medium">No courses found matching criteria.</p>
+                                        <p className="text-xs text-gray-400 mt-1">未找到匹配的课程</p>
+                                    </div>
+                                )}
                              </div>
                         </div>
                     ) : mode === 'TOPIC' ? (

@@ -72,7 +72,8 @@ export interface Topic {
   description?: string;
   // Enterprise fields
   isEnterprise?: boolean;
-  department?: string;
+  department?: string[]; // Changed to string array for Multi-select
+  subDepartment?: string[]; // New: Optional Sub-departments
   enterpriseId?: string;
   pptContext?: string; // Content extracted from PPT
 }

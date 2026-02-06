@@ -180,6 +180,23 @@ export const AVATARS: Avatar[] = [
   }
 ];
 
+// Enterprise Structure Configuration
+export const ENTERPRISE_STRUCTURE: Record<string, Record<string, string[]>> = {
+  'Marvel Corp': {
+    'Sales': ['Inside Sales', 'Field Sales', 'Key Account Management', 'Sales Operations'],
+    'HR': ['Recruitment', 'Compensation & Benefits', 'Training & Development', 'Employee Relations'],
+    'R&D': ['Frontend', 'Backend', 'AI Research', 'QA', 'Product Design'],
+    'Management': ['Executive', 'Strategy', 'Operations', 'Board Member'],
+    'Marketing': ['Digital Marketing', 'Brand Management', 'Public Relations', 'Content Strategy'],
+    'Finance': ['Accounting', 'Financial Planning', 'Tax', 'Audit']
+  },
+  'Tech Giants Inc': {
+    'Engineering': ['DevOps', 'Security', 'Cloud Infrastructure'],
+    'Product': ['Product Management', 'UX Research'],
+    'Sales': ['Enterprise Sales', 'SMB Sales']
+  }
+};
+
 export const TOPICS_DB: Topic[] = [
     // ... (Keep existing topics unchanged) ...
     // =================================================================

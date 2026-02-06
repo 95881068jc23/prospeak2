@@ -1,22 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { storageService } from '../services/storageService';
 import { Topic, UploadedFile } from '../types';
 import { parseCourseMaterials } from '../services/geminiService';
-import { ArrowLeft, Trash2, Plus, Save, Building2, BookOpen, FileText, X, Upload, File, Loader2 } from 'lucide-react';
+import { ENTERPRISE_STRUCTURE } from '../constants';
+import { ArrowLeft, Trash2, Plus, Save, Building2, BookOpen, FileText, X, Upload, File, Loader2, CheckSquare, Square, ChevronDown } from 'lucide-react';
 
 interface Props {
     onBack: () => void;
 }
 
 const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-const DEPARTMENTS = ['Sales', 'R&D', 'HR', 'Management', 'Marketing', 'Finance'];
 
 export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
     const [courses, setCourses] = useState<Topic[]>([]);
     const [showAddForm, setShowAddForm] = useState(false);
 
     // Form State
-    const [dept, setDept] = useState('Sales');
+    const [enterpriseId, setEnterpriseId] = useState('Marvel Corp');
+    const [selectedDepts, setSelectedDepts] = useState<string[]>(['Sales']);
+    const [selectedSubDepts, setSelectedSubDepts] = useState<string[]>([]);
+    
     const [level, setLevel] = useState('B1');
     const [titleEn, setTitleEn] = useState('');
     const [titleCn, setTitleCn] = useState('');
@@ -27,6 +30,22 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
     const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
     const [isParsing, setIsParsing] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Derived Options
+    const enterprises = Object.keys(ENTERPRISE_STRUCTURE);
+    
+    const availableDepts = useMemo(() => {
+        return Object.keys(ENTERPRISE_STRUCTURE[enterpriseId] || {});
+    }, [enterpriseId]);
+
+    const availableSubDepts = useMemo(() => {
+        const subs = new Set<string>();
+        selectedDepts.forEach(dept => {
+            const deptSubs = ENTERPRISE_STRUCTURE[enterpriseId]?.[dept] || [];
+            deptSubs.forEach(s => subs.add(s));
+        });
+        return Array.from(subs);
+    }, [enterpriseId, selectedDepts]);
 
     useEffect(() => {
         loadCourses();
@@ -43,10 +62,32 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
         }
     };
 
+    const toggleDept = (dept: string) => {
+        setSelectedDepts(prev => {
+            if (prev.includes(dept)) {
+                // If unchecking, remove associated sub-depts logic could be here, but simpler to keep
+                return prev.filter(d => d !== dept);
+            } else {
+                return [...prev, dept];
+            }
+        });
+    };
+
+    const toggleSubDept = (sub: string) => {
+        setSelectedSubDepts(prev => {
+            if (prev.includes(sub)) return prev.filter(s => s !== sub);
+            return [...prev, sub];
+        });
+    };
+
     const handleSave = () => {
         if (!titleEn || !titleCn || !pptContext) {
-            alert('Please fill in all fields. / 请填写所有字段。');
+            alert('Please fill in all text fields. / 请填写所有文本字段。');
             return;
+        }
+        if (selectedDepts.length === 0) {
+             alert('Please select at least one department. / 请至少选择一个部门。');
+             return;
         }
 
         const newTopic: Topic = {
@@ -56,8 +97,9 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
             category: 'BUSINESS',
             level,
             isEnterprise: true,
-            department: dept,
-            enterpriseId: 'marvel-corp',
+            department: selectedDepts,
+            subDepartment: selectedSubDepts,
+            enterpriseId: 'marvel-corp', // Keeping ID constant for demo, but logically follows selection
             pptContext
         };
 
@@ -71,7 +113,8 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
         setTitleEn('');
         setTitleCn('');
         setPptContext('');
-        setDept('Sales');
+        setSelectedDepts(['Sales']);
+        setSelectedSubDepts([]);
         setLevel('B1');
         setUploadedFiles([]);
         setUploadMode('FILE');
@@ -146,17 +189,69 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
                             
                             <div className="p-8 space-y-6">
                                 <div className="grid grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Department / 部门</label>
-                                        <select value={dept} onChange={e => setDept(e.target.value)} className="w-full p-3 border rounded-xl bg-white font-medium">
-                                            {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Enterprise / 企业</label>
+                                        <select value={enterpriseId} onChange={e => { setEnterpriseId(e.target.value); setSelectedDepts([]); setSelectedSubDepts([]); }} className="w-full p-3 border rounded-xl bg-white font-medium shadow-sm">
+                                            {enterprises.map(e => <option key={e} value={e}>{e}</option>)}
                                         </select>
                                     </div>
+
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                                            Department(s) / 部门 (Multi-select)
+                                        </label>
+                                        <div className="flex flex-wrap gap-2 p-3 border rounded-xl bg-gray-50 min-h-[50px]">
+                                            {availableDepts.map(d => {
+                                                const isSelected = selectedDepts.includes(d);
+                                                return (
+                                                    <button
+                                                        key={d}
+                                                        onClick={() => toggleDept(d)}
+                                                        className={`px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all border
+                                                            ${isSelected ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}
+                                                        `}
+                                                    >
+                                                        {isSelected ? <CheckSquare size={14}/> : <Square size={14}/>}
+                                                        {d}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {selectedDepts.length > 0 && availableSubDepts.length > 0 && (
+                                        <div className="col-span-2 animate-fadeIn">
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+                                                Sub-Department(s) / 子部门 (Optional)
+                                            </label>
+                                            <div className="flex flex-wrap gap-2 p-3 border rounded-xl bg-gray-50 min-h-[50px]">
+                                                {availableSubDepts.map(s => {
+                                                    const isSelected = selectedSubDepts.includes(s);
+                                                    return (
+                                                        <button
+                                                            key={s}
+                                                            onClick={() => toggleSubDept(s)}
+                                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all border
+                                                                ${isSelected ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'}
+                                                            `}
+                                                        >
+                                                            {isSelected ? <CheckSquare size={12}/> : <Square size={12}/>}
+                                                            {s}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Level / 难度</label>
                                         <select value={level} onChange={e => setLevel(e.target.value)} className="w-full p-3 border rounded-xl bg-white font-medium">
                                             {CEFR_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
                                         </select>
+                                    </div>
+                                    <div>
+                                        {/* Spacer to align grid if needed, or remove grid-cols-2 above */}
                                     </div>
                                 </div>
 
@@ -280,7 +375,15 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
                                     <Building2 size={24}/>
                                 </div>
                                 <div>
-                                    <span className="inline-block px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[10px] font-bold uppercase mb-1">{course.department}</span>
+                                    <div className="flex flex-wrap gap-1 mb-1">
+                                        {Array.isArray(course.department) 
+                                            ? course.department.map(d => <span key={d} className="inline-block px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase">{d}</span>)
+                                            : <span className="inline-block px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase">{course.department}</span>
+                                        }
+                                        {course.subDepartment?.map(s => (
+                                            <span key={s} className="inline-block px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold uppercase border border-purple-100">{s}</span>
+                                        ))}
+                                    </div>
                                     <h3 className="font-bold text-gray-900 leading-tight">{course.titleEn}</h3>
                                     <p className="text-sm text-gray-500">{course.titleCn}</p>
                                 </div>
