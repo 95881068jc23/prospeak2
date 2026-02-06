@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Avatar, LearningConfig, LearningMode, Topic, UploadedFile, LearningDuration, VoiceType } from '../types';
-import { AVATARS, TOPICS_DB } from '../constants';
+import { AVATARS, TOPICS_DB, ENTERPRISE_STRUCTURE } from '../constants';
 import { BookOpen, PenTool, Clock, User, Briefcase, FileText, Upload, X, Image as ImageIcon, Check, PlayCircle, ArrowLeft, Target, Globe, ToggleLeft, ToggleRight, Sparkles, Zap, Mic2, Wifi, Search, ArrowRight, BarChart, MessageCircleQuestion, Tag, RefreshCcw, LayoutTemplate, BriefcaseBusiness, LibraryBig, Trash2, CloudDownload, DownloadCloud, Loader2, ListChecks, CheckSquare, Square, Coffee, Plane, Home, Users, Heart, Sun, Moon, Cloud, Music, Video, Camera, ShoppingBag, DollarSign, TrendingUp, Cpu, Activity, Utensils, MapPin, Calendar, Smile, MessageCircle, Handshake, Monitor, Smartphone, Dumbbell,  Shirt, Ticket, Gift, Film, GraduationCap, Building2, Car, Train, CreditCard, PieChart, Lightbulb, Brain, Laugh, Trophy, Leaf, Palette, Newspaper, Laptop, Tv } from 'lucide-react';
 import { voiceService, clearLessonPlanCache, isPlanCached, generateLessonPlan, preloadLessonAssets } from '../services/geminiService';
 import { storageService } from '../services/storageService';
@@ -265,9 +265,24 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
 
   // Enterprise Mode State
   const [selectedDepartment, setSelectedDepartment] = useState<string>('Sales');
+  const [selectedSubDepartment, setSelectedSubDepartment] = useState<string[]>([]);
   const [enterpriseTopics, setEnterpriseTopics] = useState<Topic[]>([]);
   const [enterpriseSearchQuery, setEnterpriseSearchQuery] = useState('');
   const [enterpriseLevel, setEnterpriseLevel] = useState<string>('A1');
+
+  // Load Sub-departments dynamically based on selected department (assuming single enterprise for now)
+  const availableSubDepts = useMemo(() => {
+      // Defaulting to 'Marvel Corp' as per current structure assumption or taking first available
+      const entKey = Object.keys(ENTERPRISE_STRUCTURE)[0]; 
+      return ENTERPRISE_STRUCTURE[entKey]?.[selectedDepartment] || [];
+  }, [selectedDepartment]);
+
+  const toggleSubDeptSelection = (sub: string) => {
+      setSelectedSubDepartment(prev => {
+          if (prev.includes(sub)) return prev.filter(s => s !== sub);
+          return [...prev, sub];
+      });
+  };
 
   const filteredEnterpriseTopics = useMemo(() => {
       const filtered = enterpriseTopics.filter(t => {
@@ -278,16 +293,25 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
           return matchesSearch && matchesLevel;
       });
 
-      // Split into General and Role Specific
+      // Split into General and Role Specific based on User Selection
+      // General: Courses with NO sub-department OR explicit 'General' tag OR where subDept matches user selection
       const general = filtered.filter(t => 
           !t.subDepartment || t.subDepartment.length === 0 || t.subDepartment.includes('General')
       );
-      const specific = filtered.filter(t => 
-          t.subDepartment && t.subDepartment.length > 0 && !t.subDepartment.includes('General')
-      );
+
+      // Role Specific: Strictly matches selected sub-departments
+      // If NO sub-department selected, show ALL specific courses for that department
+      // If sub-department IS selected, filter by that.
+      const specific = filtered.filter(t => {
+          const isSpecific = t.subDepartment && t.subDepartment.length > 0 && !t.subDepartment.includes('General');
+          if (!isSpecific) return false;
+
+          if (selectedSubDepartment.length === 0) return true; // Show all if none selected
+          return t.subDepartment?.some(sd => selectedSubDepartment.includes(sd));
+      });
 
       return { general, specific, all: filtered };
-  }, [enterpriseTopics, enterpriseSearchQuery, enterpriseLevel]);
+  }, [enterpriseTopics, enterpriseSearchQuery, enterpriseLevel, selectedSubDepartment]);
 
   // Batch Selection State
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -791,25 +815,54 @@ export const LearningSetupScreen: React.FC<Props> = ({ onComplete, onBack }) => 
                     {mode === 'ENTERPRISE' ? (
                         <div className="space-y-6 animate-fadeIn">
                              {/* Department Selector */}
-                             <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm">
-                                <label className="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                    <Building2 size={14}/> Select Department / 选择部门
-                                </label>
-                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                                    {['Sales', 'R&D', 'HR', 'Management'].map(dept => (
-                                        <button
-                                            key={dept}
-                                            onClick={() => setSelectedDepartment(dept)}
-                                            className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all border shadow-sm
-                                                ${selectedDepartment === dept 
-                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200' 
-                                                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300'}
-                                            `}
-                                        >
-                                            {dept}
-                                        </button>
-                                    ))}
+                             <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <Building2 size={14}/> 1. Select Department / 选择部门
+                                    </label>
+                                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                        {['Sales', 'R&D', 'HR', 'Management'].map(dept => (
+                                            <button
+                                                key={dept}
+                                                onClick={() => { setSelectedDepartment(dept); setSelectedSubDepartment([]); }}
+                                                className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all border shadow-sm
+                                                    ${selectedDepartment === dept 
+                                                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200' 
+                                                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300'}
+                                                `}
+                                            >
+                                                {dept}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
+                                
+                                {availableSubDepts.length > 0 && (
+                                    <div className="animate-fadeIn">
+                                        <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                            <Target size={14}/> 2. Select Role (Optional) / 选择岗位 (可选)
+                                        </label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {availableSubDepts.map(sub => {
+                                                const isSelected = selectedSubDepartment.includes(sub);
+                                                return (
+                                                    <button
+                                                        key={sub}
+                                                        onClick={() => toggleSubDeptSelection(sub)}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border
+                                                            ${isSelected 
+                                                                ? 'bg-purple-100 text-purple-700 border-purple-300 ring-1 ring-purple-300' 
+                                                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-purple-200 hover:text-purple-600'}
+                                                        `}
+                                                    >
+                                                        {isSelected ? <CheckSquare size={12}/> : <Square size={12}/>}
+                                                        {sub}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                              </div>
 
                              {/* Search Bar */}

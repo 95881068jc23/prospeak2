@@ -306,12 +306,12 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
                                                 </div>
                                                 <span className="text-sm text-indigo-700 font-bold">Click to upload Course Materials</span>
                                                 <span className="text-xs text-indigo-400 mt-1">Supports PDF, Images (PPT screenshots)</span>
-                                                <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png" />
+                                                <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} accept=".pdf,.jpg,.jpeg,.png,.ppt,.pptx" />
                                             </div>
 
                                             {uploadedFiles.length > 0 && (
                                                 <div className="bg-white border border-gray-100 rounded-xl p-4">
-                                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2"><File size={12}/> {uploadedFiles.length} Files Selected</h4>
+                                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2"><File size={12}/> {uploadedFiles.length} Files Selected / 已选文件</h4>
                                                     <div className="flex flex-wrap gap-2 mb-4">
                                                         {uploadedFiles.map((f, i) => (
                                                             <div key={i} className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2">
@@ -327,7 +327,7 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
                                                         className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         {isParsing ? <Loader2 size={18} className="animate-spin"/> : <FileText size={18}/>}
-                                                        {isParsing ? "Analyzing Content..." : "Analyze & Extract Text"}
+                                                        {isParsing ? "Analyzing Content... / 正在解析..." : "Analyze & Extract Text / 解析并提取文本"}
                                                     </button>
                                                 </div>
                                             )}
@@ -336,13 +336,13 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center justify-between">
                                                 <span>PPT Context / PPT 内容</span>
-                                                <span className="text-indigo-600 normal-case font-normal text-[10px] bg-indigo-50 px-2 py-0.5 rounded-full">AI will generate lesson based on this</span>
+                                                <span className="text-indigo-600 normal-case font-normal text-[10px] bg-indigo-50 px-2 py-0.5 rounded-full">AI will generate lesson based on this / AI将基于此生成课程</span>
                                             </label>
                                             <textarea 
                                                 value={pptContext}
                                                 onChange={e => setPptContext(e.target.value)}
                                                 className="w-full p-4 border rounded-xl h-48 font-mono text-sm leading-relaxed focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
-                                                placeholder="Paste the text content from your PPT here. Include key points, dialogue scenarios, vocabulary lists, and objections..."
+                                                placeholder="Paste the text content from your PPT here. Include key points, dialogue scenarios, vocabulary lists, and objections... / 在此粘贴 PPT 内容，包括关键点、对话场景、词汇表等..."
                                             />
                                         </div>
                                     )}
@@ -350,9 +350,9 @@ export const EnterpriseCourseManager: React.FC<Props> = ({ onBack }) => {
                             </div>
 
                             <div className="p-6 border-t bg-gray-50 rounded-b-2xl flex justify-end gap-3">
-                                <button onClick={() => setShowAddForm(false)} className="px-6 py-3 font-bold text-gray-500 hover:bg-gray-200 rounded-xl transition-colors">Cancel</button>
+                                <button onClick={() => setShowAddForm(false)} className="px-6 py-3 font-bold text-gray-500 hover:bg-gray-200 rounded-xl transition-colors">Cancel / 取消</button>
                                 <button onClick={handleSave} className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg transition-colors flex items-center gap-2">
-                                    <Save size={18}/> Save Course
+                                    <Save size={18}/> Save Course / 保存课程
                                 </button>
                             </div>
                         </div>
