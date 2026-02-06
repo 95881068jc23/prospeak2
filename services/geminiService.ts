@@ -111,12 +111,24 @@ export const parseCourseMaterials = async (files: UploadedFile[]): Promise<strin
     
     const ai = getAI();
     try {
-        const parts = files.map(file => ({
-            inlineData: {
-                mimeType: file.mimeType || 'application/pdf',
-                data: file.data
+        const parts = files.map(file => {
+            // Force correct MIME type for PPT/PPTX based on extension if missing or generic
+            let mimeType = file.mimeType || 'application/pdf';
+            const lowerName = (file.name || '').toLowerCase();
+            
+            if (lowerName.endsWith('.pptx')) {
+                mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+            } else if (lowerName.endsWith('.ppt')) {
+                mimeType = 'application/vnd.ms-powerpoint';
             }
-        }));
+
+            return {
+                inlineData: {
+                    mimeType: mimeType,
+                    data: file.data
+                }
+            };
+        });
 
         const prompt = `
         Analyze these course materials (PPT/PDF/Images).
