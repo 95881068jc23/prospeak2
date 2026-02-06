@@ -143,7 +143,7 @@ export const parseCourseMaterials = async (files: UploadedFile[]): Promise<strin
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash", // Use 2.5 Flash for Multimodal per user request
+            model: "gemini-3-flash-preview", // Align with main chat model which is working
             contents: [{ 
                 role: 'user', 
                 parts: [
